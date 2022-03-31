@@ -1,0 +1,275 @@
+---
+title: "casecontrol_mapuche"
+author: "redelab"
+date: "03-2022"
+output: html_document
+---
+
+# wd
+```{r}
+setwd("/home/rober/Escritorio/hom_mapuche")
+```
+
+
+# Cargar paquetes necesarios del codigo de Smith
+```{r warning=FALSE, message=FALSE}
+library(tidyverse)
+#install.packages("biglm")
+library(biglm)
+#install.packages("ergm")
+library(ergm)
+library(doParallel)
+library(igraph)
+```
+
+# cargar funciones desde el git de Smith
+```{r}
+source("https://raw.githubusercontent.com/JeffreyAlanSmith/case_control_logistic/master/functions/ego_net_case_control_model.R")
+source("https://raw.githubusercontent.com/JeffreyAlanSmith/case_control_logistic/master/functions/output_glm_formula.R")
+source("https://raw.githubusercontent.com/JeffreyAlanSmith/case_control_logistic/master/functions/prepare_case_control_logistic_data_function_create_vars.R")
+source("https://raw.githubusercontent.com/JeffreyAlanSmith/case_control_logistic/master/functions/prepare_case_control_logistic_data_function.R")
+```
+
+# Data
+```{r}
+# load data
+load("/home/rober/Escritorio/hom_mapuche/cep_hom.Rdata")
+
+# to character
+cep_hom<-cep_hom %>%
+  mutate(across(everything(), as.character))
+```
+
+## Replication
+
+Crearemos una lista, donde cada segmento es un atributo diferente,
+```{r}
+#name of degree column on data frame:
+var.name.degree="tamred"
+
+#names of key ego attribute columns in data frame:
+var.name.characs=c("sexo","educ","mapu") 
+
+var.name.characs.alter=list()
+
+for (p in 1:length(var.name.characs)){
+  var.name.characs.alter[[p]]=paste(var.name.characs[[p]],1:5,sep="")
+}
+
+#var.name.characs.alter[[7]]<-NULL
+#Let's take a look:
+var.name.characs.alter 
+```
+
+## Fórmula
+
+Ahora vamos a fijar la fórmula de interés. Los posibles términos son los siguientes:
+
+`nodematch` = un término de coincidencia/sin coincidencia (¿ego y alter coinciden en un atributo?)
+`nodemix` = incluye términos para todos los pares de categorías en el atributo de interés.
+`absdiff` = incluye un término para mostrar la diferencia absoluta entre ego y alter (apropiado para variables continuas.
+`nodefactor` =controla el grado de los diferentes grupos (ajustando las estimaciones de homofilia el hecho de que algunos grupos, por ejemplo, los hombres, tienen más vínculos que otros grupos, como las mujeres).
+`nodecov` = similar a nodefactor pero apropiado para variables continuas. Como nota general, es que el algoritmo puede incluir una lista de formulas.
+
+#help("ergm-terms")
+
+https://cran.r-project.org/web/packages/ergm/vignettes/ergm-term-crossRef.html
+http://statnet.org/nme/d2-ergmterms.html
+https://eehh-stanford.github.io/SNA-workshop/ergm-intro.html#some-practical-reasons
+
+
+# Preparing data
+```{r}
+# delete missing 
+cep_hom<-cep_hom%>%drop_na(educ)
+cep_hom$pond<-round(as.numeric(cep_hom$pond),3)
+#cep_hom$tamred<-as.integer(cep_hom$tamred)
+```
+
+# defining formula
+```{r}
+formula_ego<- as.formula(~   nodematch("sexo", diff=TRUE) 
+                           + nodematch("educ", diff=TRUE)
+                           + nodematch("mapu", diff=TRUE)
+                           + nodefactor("sexo")
+                           + nodefactor("educ")
+                           + nodefactor("mapu"))
+```
+
+## Análisis 1 Todos los confidentes (Weighted random matching)
+
+En este primer procedimiento se parea a los respondientes de manera aleatoria y en base a los pesos de probabilidad. 
+
+### Modelo 1 
+```{r}
+modelo1<-egonet_case_control_model(formula=formula_ego,
+                                   ego_data=cep_hom,
+                                   var.name.degree=var.name.degree, 
+                                   var.name.characs=var.name.characs,
+                                   var.name.characs.alter=var.name.characs.alter, 
+                                   case.control.type="weighted.random.matching", 
+                                   max.alter=5,
+                                   max.control.data.N=100000,
+                                   remove.isolates.control=T, 
+                                   #weight.var.name="pond", 
+                                   weight.var.name.control="pond", 
+                                   num.iterations=10,
+                                   bootstrap.sample=T, 
+                                   num.bootstrap.samples=100,
+                                   useparallel=T, 
+                                   num.cores=8,
+                                   maxit=20,
+                                   adjust.intercept=F)
+modelo1$fit
+#modelo1$coefs
+#save(modelo1, file = "C:/Users/rober/Desktop/homofilia_elsoc/modelo1.Rdata")
+
+```
+
+```{r}
+#names(modelo1)
+coefs=modelo1$coefs
+rm(mean)
+head(coefs)
+
+coefs_sample=aggregate(.~sample, data=coefs, mean)
+coefs_sample
+
+coefs_sample=coefs_sample[,-which(colnames(coefs_sample) %in% c("sample","iteration"))]
+
+apply(coefs_sample, 2, mean)
+apply(coefs_sample, 2, sd)
+apply(coefs_sample, 2, quantile, c(.025, .975))
+
+apply(modelo5$fit["bic"], 2, mean)
+apply(modelo5$fit["aic"], 2, mean)
+apply(modelo5$fit["N.dyads"], 2, mean)
+
+```
+
+### Estimar SE
+```{r}
+std_mean <- function(x) sd(x)/sqrt(length(x))
+std_mean(coefs_sample$nodematch.mapu.si)
+```
+
+## Wald 
+```{r}
+z <- (2.933 - 0.1) / 0.016
+pnorm(q=z, lower.tail=FALSE) 
+```
+
+## Análisis 2: No familiares 
+### Select data
+```{r}
+#cargar libreria
+library(panelr) 
+
+# crear id
+cep_hom <- tibble::rowid_to_column(cep_hom, "id")
+
+# data ego
+cep_hom_ego<-cep_hom%>%
+  dplyr::select(id,sexo,educ,mapu,tamred,pond)
+
+# data alter
+cep_hom_alter<- cep_hom %>% 
+  dplyr::select(id,
+                sexo_alter1=sexo1,sexo_alter2=sexo2,sexo_alter3=sexo3,sexo_alter4=sexo4,sexo_alter5=sexo5,
+                educ_alter1=educ1,educ_alter2=educ2,educ_alter3=educ3,educ_alter4=educ4,educ_alter5=educ5,
+                mapu_alter1=mapu1,mapu_alter2=mapu2,mapu_alter3=mapu3,mapu_alter4=mapu4,mapu_alter5=mapu5,
+                 rel_alter1=rel1,  rel_alter2=rel2,  rel_alter3=rel3,  rel_alter4=rel4,  rel_alter5=rel5)
+
+#recodificar datos perdidos
+cep_hom_alter[is.na(cep_hom_alter)]<-"999"
+
+# convertir a long alternativa 1
+cep_hom_alter_long<-long_panel(as.data.frame(cep_hom_alter), prefix = "_alter", begin = 1, end = 5, label_location = "end")
+head(cep_hom_alter_long)
+
+# filtrar por no fam
+cep_long_nofam<-cep_hom_alter_long %>% dplyr::filter(rel=="nofam")
+
+# convertir a wide no fam
+cep_wide_nofam<-widen_panel(cep_long_nofam, separator = "_alter")
+
+
+# cambiar alter
+cep_wide_nofam<-cep_wide_nofam%>%
+  dplyr::select(id,
+             sexo1=sexo_alter1, sexo2=sexo_alter2,sexo3=sexo_alter3,sexo4=sexo_alter4,sexo5=sexo_alter5,
+             educ1=educ_alter1, educ2=educ_alter2,educ3=educ_alter3,educ4=educ_alter4,educ5=educ_alter5,
+             mapu1=mapu_alter1, mapu2=mapu_alter2,mapu3=mapu_alter3,mapu4=mapu_alter4,mapu5=mapu_alter5,
+               rel1=rel_alter1,   rel2=rel_alter2,    l3=rel_alter3,  rel4=rel_alter4,  rel5=rel_alter5)
+
+# join
+cep_wide_nofam$id<-as.numeric(cep_wide_nofam$id)
+cep_hom_nofam<-dplyr::left_join(cep_wide_nofam, 
+                                cep_hom_ego, 
+                                by="id")
+
+```
+
+```{r}
+modelo2<-egonet_case_control_model(formula=formula_ego,
+                                   ego_data=cep_hom_nofam,
+                                   var.name.degree=var.name.degree, 
+                                   var.name.characs=var.name.characs,
+                                   var.name.characs.alter=var.name.characs.alter, 
+                                   case.control.type="weighted.random.matching", 
+                                   max.alter=5,
+                                   max.control.data.N=100000,
+                                   remove.isolates.control=T, 
+                                   #weight.var.name="pond", 
+                                   weight.var.name.control="pond", 
+                                   num.iterations=10,
+                                   bootstrap.sample=T, 
+                                   num.bootstrap.samples=100,
+                                   useparallel=T, 
+                                   num.cores=8,
+                                   maxit=20,
+                                   adjust.intercept=F)
+
+#modelo2$fit
+save(modelo2, file = "C:/Users/rober/Desktop/homofilia_elsoc/modelo2.Rdata")
+```
+
+```{r}
+names(modelo2)
+coefs_nofam=modelo2$coefs
+head(coefs_nofam)
+
+coefs_sample_nofam=aggregate(.~sample, data=coefs_nofam, mean)
+coefs_sample_nofam
+
+coefs_sample_nofam=coefs_sample_nofam[,-which(colnames(coefs_sample_nofam) %in% c("sample","iteration"))]
+
+apply(coefs_sample_nofam, 2, mean)
+apply(coefs_sample_nofam, 2, sd)
+apply(coefs_sample_nofam, 2, quantile, c(.025, .975))
+
+apply(modelo9$fit["bic"], 2, mean)
+apply(modelo9$fit["aic"], 2, mean)
+apply(modelo9$fit["N.dyads"], 2, mean)
+
+```
+
+### Estimar SE
+```{r}
+std_mean <- function(x) sd(x)/sqrt(length(x))
+std_mean(coefs_sample_nofam$nodematch.mapu.si)
+```
+
+## Wald 
+```{r}
+z <- (2.855 - 0.1) / 0.023
+pnorm(q=z, lower.tail=FALSE) 
+```
+
+
+
+# Bibliografía 
+
+- Bargsted Valdés, M. A., Espinoza, V., & Plaza, A. (2020). Pautas de Homofilia en Chile. Papers. Revista de Sociología, 105(4), 583. https://doi.org/10.5565/rev/papers.2617
+
+- Smith, J. A., McPherson, M., & Smith-Lovin, L. (2014). Social Distance in the United States: Sex, Race, Religion, Age, and Education Homophily among Confidants, 1985 to 2004. American Sociological Review, 79(3), 432-456. https://doi.org/10.1177/0003122414531776

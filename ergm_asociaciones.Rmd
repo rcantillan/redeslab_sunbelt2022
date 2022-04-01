@@ -1,0 +1,1458 @@
+---
+title: "ERGM asociaciones"
+output: 
+  xaringan::moon_reader:
+    seal: false
+    chakra: https://remarkjs.com/downloads/remark-latest.min.js
+    lib_dir: libs
+    nature:
+#      highlightStyle: tomorrow-night-bright
+#      highlightLines: true
+      highlightLanguage: r
+      includePresenterNotes: true
+      ratio: "16:9"
+#      countIncrementalSlides: false
+    includes:
+    css: css/xaringan.css
+
+---
+
+```{r,echo=FALSE,message=F}
+pacman::p_load(intergraph,
+               tidygraph,
+               igraph,
+               network,
+               signnet,
+               sna,
+               MASS,
+               ggplot2,
+               ggraph,
+               backbone,
+               dplyr,
+               readr,
+               reshape2,
+               extrafont,
+               kableExtra,
+               table1,
+               flextable,
+               tigerstats,
+               foreign,
+               xtable,
+               Hmisc,
+               sjmisc,
+               memisc,
+               nnet,
+               lattice,
+               texreg,
+               panelr)
+
+```
+
+
+```{r,echo=FALSE}
+#2016
+load("C:/Users/rober/Desktop/ELSOC/ELSOC_W01_v4.01_R (3).RData")
+#2018
+load("C:/Users/rober/Desktop/ELSOC/ELSOC_W03_v2.00_R.RData")
+```
+
+```{r,echo=FALSE}
+
+asociaciones_2016 <- elsoc_2016 %>%
+  dplyr::mutate (JJVV         = ifelse(c12_01>=2, 1, 0)) %>%
+  dplyr::mutate (Religious    = ifelse(c12_02>=2, 1, 0)) %>%
+  dplyr::mutate (Polit.party  = ifelse(c12_03>=2, 1, 0)) %>%
+  dplyr::mutate (Sporty       = ifelse(c12_07>=2, 1, 0)) %>%
+  dplyr::mutate (AAEE         = ifelse(c12_08>=2, 1, 0)) %>%
+  dplyr::mutate (Charity      = ifelse(c12_06>=2, 1, 0)) %>%
+  dplyr::mutate (Labor.union  = ifelse(c12_04>=2, 1, 0)) %>%
+  dplyr::mutate (Professional = ifelse(c12_05>=2, 1, 0)) %>%
+  dplyr::mutate (Other        = ifelse(c12_09>=2, 1, 0)) %>%
+  dplyr::select (idencuesta, JJVV, Religious, AAEE, Sporty, Polit.party, 
+                 Professional, Labor.union, Charity, Other)
+
+asociaciones_2018 <- elsoc_2018 %>%
+  dplyr::filter(muestra==1)%>% #seleccionar casos de la muestra original
+  dplyr::mutate (JJVV         = ifelse(c12_01>=2, 1, 0)) %>%
+  dplyr::mutate (Religious    = ifelse(c12_02>=2, 1, 0)) %>%
+  dplyr::mutate (Polit.party  = ifelse(c12_03>=2, 1, 0)) %>%
+  dplyr::mutate (Sporty       = ifelse(c12_07>=2, 1, 0)) %>%
+  dplyr::mutate (AAEE         = ifelse(c12_08>=2, 1, 0)) %>%
+  dplyr::mutate (Charity      = ifelse(c12_06>=2, 1, 0)) %>%
+  dplyr::mutate (Labor.union  = ifelse(c12_04>=2, 1, 0)) %>%
+  dplyr::mutate (Professional = ifelse(c12_05>=2, 1, 0)) %>%
+  dplyr::mutate (Other        = ifelse(c12_09>=2, 1, 0)) %>%
+  dplyr::select (idencuesta, JJVV, Religious, AAEE, Sporty, Polit.party, 
+                 Professional, Labor.union, Charity, Other)
+
+```
+
+```{r,echo=FALSE}
+asociaciones_2016[asociaciones_2016=="-999"] <- NA
+asociaciones_2016[asociaciones_2016=="-888"] <- NA
+asociaciones_2018[asociaciones_2018=="-999"] <- NA
+asociaciones_2018[asociaciones_2018=="-888"] <- NA
+```
+
+```{r,echo=FALSE}
+
+asociaciones_2016d <- elsoc_2016 %>%
+  dplyr::mutate (JJVV         = ifelse(c12_01<2, 0, 1)) %>%
+  dplyr::mutate (Religious    = ifelse(c12_02<2, 0, 1)) %>%
+  dplyr::mutate (Polit.party  = ifelse(c12_03<2, 0, 1)) %>%
+  dplyr::mutate (Sporty       = ifelse(c12_07<2, 0, 1)) %>%
+  dplyr::mutate (AAEE         = ifelse(c12_08<2, 0, 1)) %>%
+  dplyr::mutate (Charity      = ifelse(c12_06<2, 0, 1)) %>%
+  dplyr::mutate (Labor.union  = ifelse(c12_04<2, 0, 1)) %>%
+  dplyr::mutate (Professional = ifelse(c12_05<2, 0, 1)) %>%
+  dplyr::mutate (Other        = ifelse(c12_09<2, 0, 1)) %>%
+  dplyr::mutate (women        = case_when(m0_sexo   == 1    ~ "men",
+                                          m0_sexo   == 2    ~ "women")) %>%
+  dplyr::mutate (age         = case_when(m0_edad %in% 18:29 ~ "young",
+                                         m0_edad %in% 30:65 ~ "adult",
+                                         m0_edad %in% 66:88 ~ "older adult")) %>%
+  dplyr::mutate (educ        = case_when(m01     %in% 1 :7  ~ "non-university",
+                                         m01     %in% 8 :10 ~ "university"))%>%
+  dplyr::select(idencuesta, JJVV, Religious, AAEE, Sporty, Polit.party,Professional, 
+                Labor.union, Charity, Other, women,age,educ)%>%
+  as.data.frame()
+
+
+asociaciones_2018d <- elsoc_2018 %>%
+  dplyr::mutate (JJVV         = ifelse(c12_01<2, 0, 1)) %>%
+  dplyr::mutate (Religious    = ifelse(c12_02<2, 0, 1)) %>%
+  dplyr::mutate (Polit.party  = ifelse(c12_03<2, 0, 1)) %>%
+  dplyr::mutate (Sporty       = ifelse(c12_07<2, 0, 1)) %>%
+  dplyr::mutate (AAEE         = ifelse(c12_08<2, 0, 1)) %>%
+  dplyr::mutate (Charity      = ifelse(c12_06<2, 0, 1)) %>%
+  dplyr::mutate (Labor.union  = ifelse(c12_04<2, 0, 1)) %>%
+  dplyr::mutate (Professional = ifelse(c12_05<2, 0, 1)) %>%
+  dplyr::mutate (Other        = ifelse(c12_09<2, 0, 1)) %>%
+  dplyr::mutate (women        = case_when(m0_sexo   == 1     ~ "men",
+                                          m0_sexo   == 2     ~ "women")) %>%
+  dplyr::mutate (age          = case_when(m0_edad %in% 18:29 ~ "young",
+                                          m0_edad %in% 30:65 ~ "adult",
+                                          m0_edad %in% 66:88 ~ "older adult")) %>%
+  dplyr::mutate (educ         = case_when(m01     %in% 1 :7  ~ "non-university",
+                                          m01     %in% 8 :10 ~ "university"))%>%
+  dplyr::select(idencuesta, JJVV, Religious, AAEE, Sporty, Polit.party,Professional, 
+                Labor.union, Charity, Other, women,age,educ)%>%
+  as.data.frame()
+```
+
+```{r,echo=FALSE}
+t1<-rowPerc(xtabs(~JJVV        +women,data=asociaciones_2016d))
+t2<-rowPerc(xtabs(~Religious   +women,data=asociaciones_2016d))
+t3<-rowPerc(xtabs(~Sporty      +women,data=asociaciones_2016d))
+t4<-rowPerc(xtabs(~Charity     +women,data=asociaciones_2016d))
+t5<-rowPerc(xtabs(~Polit.party +women,data=asociaciones_2016d))
+t6<-rowPerc(xtabs(~Professional+women,data=asociaciones_2016d))
+t7<-rowPerc(xtabs(~Labor.union +women,data=asociaciones_2016d))
+t8<-rowPerc(xtabs(~AAEE        +women,data=asociaciones_2016d))
+t9<-rowPerc(xtabs(~Other       +women,data=asociaciones_2016d))
+
+a<-rbind(t1,t2,t3,t4,t5,t6,t7,t8,t9)
+a<-as.data.frame(a)
+a$part<-c(0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1)
+a1<-a[a$part==1,]
+
+a1$Type<-c("JJVV","Religious","Sporty","Charity","Polit.party","Professional","Labor.union","AAEE","Other")
+a1<-a1%>%
+  dplyr::select(Type,men,women)
+#a1
+```
+
+```{r,echo=FALSE}
+t1<-rowPerc(xtabs(~JJVV        +educ,data=asociaciones_2016d))
+t2<-rowPerc(xtabs(~Religious   +educ,data=asociaciones_2016d))
+t3<-rowPerc(xtabs(~Sporty      +educ,data=asociaciones_2016d))
+t4<-rowPerc(xtabs(~Charity     +educ,data=asociaciones_2016d))
+t5<-rowPerc(xtabs(~Polit.party +educ,data=asociaciones_2016d))
+t6<-rowPerc(xtabs(~Professional+educ,data=asociaciones_2016d))
+t7<-rowPerc(xtabs(~Labor.union +educ,data=asociaciones_2016d))
+t8<-rowPerc(xtabs(~AAEE        +educ,data=asociaciones_2016d))
+t9<-rowPerc(xtabs(~Other       +educ,data=asociaciones_2016d))
+
+a<-rbind(t1,t2,t3,t4,t5,t6,t7,t8,t9)
+a<-as.data.frame(a)
+a$part<-c(0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1)
+a2<-a[a$part==1,]
+a2<-a2%>%
+  dplyr::select("non-university", "university")
+```
+
+```{r,echo=FALSE}
+t1<-rowPerc(xtabs(~JJVV        +age,data=asociaciones_2016d))
+t2<-rowPerc(xtabs(~Religious   +age,data=asociaciones_2016d))
+t3<-rowPerc(xtabs(~Sporty      +age,data=asociaciones_2016d))
+t4<-rowPerc(xtabs(~Charity     +age,data=asociaciones_2016d))
+t5<-rowPerc(xtabs(~Polit.party +age,data=asociaciones_2016d))
+t6<-rowPerc(xtabs(~Professional+age,data=asociaciones_2016d))
+t7<-rowPerc(xtabs(~Labor.union +age,data=asociaciones_2016d))
+t8<-rowPerc(xtabs(~AAEE        +age,data=asociaciones_2016d))
+t9<-rowPerc(xtabs(~Other       +age,data=asociaciones_2016d))
+
+a<-rbind(t1,t2,t3,t4,t5,t6,t7,t8,t9)
+a<-as.data.frame(a)
+a$part<-c(0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1)
+a3<-a[a$part==1,]
+a3<-a3%>%
+  dplyr::select(young, adult, "older adult")
+
+```
+
+```{r,echo=FALSE,results='asis'}
+tabla1<-cbind(a1,a2,a3)
+tabla1<-as.data.frame(tabla1)
+tabla1<-tibble::rowid_to_column(tabla1, "id")
+
+tabla1<-tabla1 %>%
+  kbl(caption = "Composition (%) of participants in voluntary associations (ELSOC 2016)") %>%
+    kable_classic("hover", full_width = F)
+```
+
+
+```{r,echo=FALSE}
+t1<-rowPerc(xtabs(~JJVV        +women,data=asociaciones_2018d))
+t2<-rowPerc(xtabs(~Religious   +women,data=asociaciones_2018d))
+t3<-rowPerc(xtabs(~Sporty      +women,data=asociaciones_2018d))
+t4<-rowPerc(xtabs(~Charity     +women,data=asociaciones_2018d))
+t5<-rowPerc(xtabs(~Polit.party +women,data=asociaciones_2018d))
+t6<-rowPerc(xtabs(~Professional+women,data=asociaciones_2018d))
+t7<-rowPerc(xtabs(~Labor.union +women,data=asociaciones_2018d))
+t8<-rowPerc(xtabs(~AAEE        +women,data=asociaciones_2018d))
+t9<-rowPerc(xtabs(~Other       +women,data=asociaciones_2018d))
+
+a<-rbind(t1,t2,t3,t4,t5,t6,t7,t8,t9)
+a<-as.data.frame(a)
+a$part<-c(0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1)
+a1<-a[a$part==1,]
+
+a1$Type<-c("JJVV","Religious","Sporty","Charity","Polit.party","Professional","Labor.union","AAEE","Other")
+a1<-a1%>%
+  dplyr::select(Type,men,women)
+#a1
+```
+
+```{r,echo=FALSE}
+t1<-rowPerc(xtabs(~JJVV        +educ,data=asociaciones_2018d))
+t2<-rowPerc(xtabs(~Religious   +educ,data=asociaciones_2018d))
+t3<-rowPerc(xtabs(~Sporty      +educ,data=asociaciones_2018d))
+t4<-rowPerc(xtabs(~Charity     +educ,data=asociaciones_2018d))
+t5<-rowPerc(xtabs(~Polit.party +educ,data=asociaciones_2018d))
+t6<-rowPerc(xtabs(~Professional+educ,data=asociaciones_2018d))
+t7<-rowPerc(xtabs(~Labor.union +educ,data=asociaciones_2018d))
+t8<-rowPerc(xtabs(~AAEE        +educ,data=asociaciones_2018d))
+t9<-rowPerc(xtabs(~Other       +educ,data=asociaciones_2018d))
+
+a<-rbind(t1,t2,t3,t4,t5,t6,t7,t8,t9)
+a<-as.data.frame(a)
+a$part<-c(0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1)
+a2<-a[a$part==1,]
+a2<-a2%>%
+  dplyr::select("non-university", "university")
+```
+
+```{r,echo=FALSE}
+t1<-rowPerc(xtabs(~JJVV        +age,data=asociaciones_2018d))
+t2<-rowPerc(xtabs(~Religious   +age,data=asociaciones_2018d))
+t3<-rowPerc(xtabs(~Sporty      +age,data=asociaciones_2018d))
+t4<-rowPerc(xtabs(~Charity     +age,data=asociaciones_2018d))
+t5<-rowPerc(xtabs(~Polit.party +age,data=asociaciones_2018d))
+t6<-rowPerc(xtabs(~Professional+age,data=asociaciones_2018d))
+t7<-rowPerc(xtabs(~Labor.union +age,data=asociaciones_2018d))
+t8<-rowPerc(xtabs(~AAEE        +age,data=asociaciones_2018d))
+t9<-rowPerc(xtabs(~Other       +age,data=asociaciones_2018d))
+
+a<-rbind(t1,t2,t3,t4,t5,t6,t7,t8,t9)
+a<-as.data.frame(a)
+a$part<-c(0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1)
+a3<-a[a$part==1,]
+a3<-a3%>%
+  dplyr::select(young, adult, "older adult")
+
+```
+
+```{r,echo=FALSE,results='asis'}
+tabla2<-cbind(a1,a2,a3)
+tabla2<-as.data.frame(tabla2)
+tabla2<-tibble::rowid_to_column(tabla2, "id")
+
+tabla2<- tabla2 %>%
+  kbl(caption = "Composition (%) of participants in voluntary associations (ELSOC 2018)") %>%
+    kable_classic("hover", full_width = F)
+#tabla2
+```
+
+
+# Crear matrices de atributos individuales
+## 2016
+```{r}
+#atributos_2016<-asociaciones_2016d%>%
+#  dplyr::select(idencuesta, women, age, educ )
+
+atributos_2016=asociaciones_2016d
+
+#atributos_2018<-asociaciones_2018d%>%
+#  dplyr::select(idencuesta, women, age, educ )
+
+atributos_2018=asociaciones_2018d
+```
+
+# ERGM 
+
+## Modelos de homofilia. 
+
+Creamos matrices modo 2. ID x ID  
+```{r, echo=FALSE, include=FALSE,message=F}
+
+rownames(asociaciones_2016) <- asociaciones_2016$idencuesta
+asociaciones_2016$idencuesta<-NULL
+
+#asociaciones_2016<-as.matrix(asociaciones_2016)
+#overlap_2016 <- asociaciones_2016%*%t(asociaciones_2016)
+
+rownames(asociaciones_2018) <- asociaciones_2018$idencuesta
+asociaciones_2018$idencuesta<-NULL
+
+```
+
+## Modelos de grados fijos
+```{r, echo=FALSE, include=FALSE}
+#rm(list=ls())
+
+### Fixed Degree Sequence Model 
+asociaciones_2016<-as.matrix(asociaciones_2016)
+fdsm_2016  <- fdsm(asociaciones_2016, trials = 1)
+#summary(fdsm_2016)
+fdsm_bb_2016 <- backbone.extract(fdsm_2016, signed = F, alpha = 0.05) 
+fdsm_bb_2016 <- as.matrix(fdsm_bb_2016)
+table(fdsm_bb_2016)
+#fdsm_2016
+
+
+### Fixed Degree Sequence Model 
+asociaciones_2018<-as.matrix(asociaciones_2018)
+fdsm_2018  <- fdsm(asociaciones_2018, trials = 1)
+fdsm_bb_2018 <- backbone::backbone.extract(fdsm_2018, signed = F, alpha = 0.05) 
+fdsm_bb_2018 <- as.matrix(fdsm_bb_2018)
+table(fdsm_bb_2018)
+
+fdsm1=fdsm_bb_2016
+table(fdsm1)
+fdsm2=fdsm_bb_2018
+table(fdsm2)
+#fdsm_2018
+```
+
+
+# 2016
+
+```{r}
+set.seed(5)
+options(scipen = 999) #disable scientific notation
+options(scipen = 0)
+library(ggplot2)
+library(GGally)
+library(cowplot)
+library(reshape2)
+library(rms)
+library(igraph)
+
+
+## edgelist desde backbone
+edge <- melt(fdsm1)
+
+colnames(edge) <- c("i", "j", "collab")
+edge$collab[which(edge$i==edge$j)] <- NA  #Make diagonal missing
+head(edge)
+```
+
+
+
+```{r}
+## Agregar atributos de nodos
+atributos1 <- data.frame(i=atributos_2016$idencuesta, gender.i=atributos_2016$women,
+                      age.i=atributos_2016$age, educ.i = atributos_2016$educ,
+                      jjvv.i=atributos_2016$JJVV, relig.i=atributos_2016$Religious,
+                      eeaa.i=atributos_2016$AAEE, sport.i=atributos_2016$Sporty,
+                      polparty.i=atributos_2016$Polit.party, prof.i=atributos_2016$Professional,
+                      labu.i=atributos_2016$Labor.union, chari.i=atributos_2016$Charity,
+                      other.i=atributos_2016$Other)
+edge <- merge(edge, atributos1, by="i")
+
+atributos2 <- data.frame(j=atributos_2016$idencuesta, gender.j=atributos_2016$women,
+                      age.j=atributos_2016$age, educ.j = atributos_2016$educ,
+                       jjvv.j=atributos_2016$JJVV, relig.j=atributos_2016$Religious,
+                      eeaa.j=atributos_2016$AAEE, sport.j=atributos_2016$Sporty,
+                      polparty.j=atributos_2016$Polit.party, prof.j=atributos_2016$Professional,
+                      labu.j=atributos_2016$Labor.union, chari.j=atributos_2016$Charity,
+                      other.j=atributos_2016$Other)
+edge <- merge(edge, atributos2, by="j")
+
+egos<-atributos1%>%
+  dplyr::select(i,gender=gender.i, age=age.i, educ=educ.i)
+
+```
+
+
+```{r}
+# eliminar NA en y
+edge<-edge %>% tidyr::drop_na(collab)
+```
+
+## Construir match-variables
+```{r}
+## género
+edge$bothmen <- 0
+edge$bothmen[which(edge$gender.i=="men" & edge$gender.j=="men")] <- 1
+
+edge$bothwomen <- 0
+edge$bothwomen[which(edge$gender.i=="women" & edge$gender.j=="women")] <- 1
+
+## edad
+edge$both.old.adult <- 0
+edge$both.old.adult[which(edge$age.i=="older adult" & edge$age.j=="older adult")] <- 1
+
+edge$bothadult <- 0
+edge$bothadult[which(edge$age.i=="adult" & edge$age.j=="adult")] <- 1
+
+edge$bothyoung <- 0
+edge$bothyoung[which(edge$party.i=="young" & edge$party.j=="young")] <- 1
+
+## educa
+edge$bothuniv <- 0
+edge$bothuniv[which(edge$educ.i=="university" & edge$educ.j=="university")] <- 1
+
+edge$both.non.univ <- 0
+edge$both.non.univ[which(edge$educ.i=="non-university" & edge$educ.j=="non-university")] <- 1
+
+## degree
+edge$mindegree <- edge$degree.i
+edge$mindegree[which(edge$degree.j < edge$degree.i)] <- edge$degree.j[which(edge$degree.j < edge$degree.i)]
+
+## JJVV
+edge$bothjjvv<-0
+edge$bothjjvv[which(edge$jjvv.i==1 & edge$jjvv.j==1)] <- 1
+
+## Relig
+edge$bothrelig<-0
+edge$bothrelig[which(edge$relig.i==1 & edge$relig.j==1)] <- 1
+
+## EEAA
+edge$botheeaa<-0
+edge$botheeaa[which(edge$eeaa.i==1 & edge$eeaa.j==1)] <- 1
+
+## Sport
+edge$bothsport<-0
+edge$bothsport[which(edge$sport.i==1 & edge$sport.j==1)]<-1
+                      
+## pol. party
+edge$bothpolparty<-0
+edge$bothpolparty[which(edge$polparty.i==1 & edge$polparty.j==1)] <- 1
+
+## professional
+edge$bothprof<-0
+edge$bothprof[which(edge$prof.i==1 & edge$prof.j==1)] <- 1
+
+## labor union
+edge$bothlabu<-0
+edge$bothlabu[which(edge$labu.i==1 & edge$labu.j==1)] <- 1 
+
+## charity
+edge$bothchari<-0
+edge$bothchari[which(edge$chari.i==1 & edge$chari.j==1)] <- 1
+
+## other
+edge$bothother<-0
+edge$bothother[which(edge$other.i==1 & edge$other.j==1)] <- 1
+                      
+```
+
+
+## transform to egor
+```{r}
+edge_jjvv<-edge%>%
+  dplyr::filter(edge$bothjjvv==1)%>% #filtrar por diadas observadas
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothjjvv)
+
+edge_relig<-edge%>%
+  dplyr::filter(edge$bothrelig==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothrelig)
+
+edge_eeaa<-edge%>%
+  dplyr::filter(edge$botheeaa==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, botheeaa)
+
+edge_sport<-edge%>%
+  dplyr::filter(edge$bothsport==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothsport)
+
+edge_polparty<-edge%>%
+  dplyr::filter(edge$bothpolparty==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothpolparty)
+
+edge_prof<-edge%>%
+  dplyr::filter(edge$bothprof==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothprof)
+
+edge_labu<-edge%>%
+  dplyr::filter(edge$bothlabu==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothlabu)
+
+edge_chari<-edge%>%
+  dplyr::filter(edge$bothchari==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothchari)
+
+edge_other<-edge%>%
+  dplyr::filter(edge$bothother==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothother)
+
+```
+
+
+```{r}
+library(egor)
+#rm(model, fdsm1, fdsm2,fdsm_bb_2016,fdsm_bb_2018, fdsm_2016, fdsm_2018)
+
+
+egor_jjvv <- egor(alters = edge_jjvv, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+#summary(egor_jjvv)
+
+egor_relig <- egor(alters = edge_relig, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_eeaa <- egor(alters = edge_eeaa, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_sport <- egor(alters = edge_sport, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_polparty <- egor(alters = edge_polparty, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_prof <- egor(alters = edge_prof, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_labu <- egor(alters = edge_labu, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_chari <- egor(alters = edge_chari, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_other <- egor(alters = edge_other, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+```
+
+
+# modelos `ergm.ego`2016
+## JJVV
+```{r}
+library(ergm.ego)
+library(egor)
+#install.packages("ergm")
+library(ergm)
+library(tidyverse)
+
+egor_jjvv[["ego"]]  <-egor_jjvv[["ego"]]%>%drop_na(educ)
+egor_jjvv[["alter"]]<-egor_jjvv[["alter"]]%>%drop_na(educ)
+egor_jjvv[["ego"]]  <-egor_jjvv[["ego"]]%>%drop_na(age)
+egor_jjvv[["alter"]]<-egor_jjvv[["alter"]]%>%drop_na(age)
+
+modelo_jjvv_2016<-ergm.ego(egor_jjvv ~ 
+                  + nodefactor("gender")
+                  + nodefactor("age", levels = -LARGEST)
+                  + nodematch("gender",  diff=TRUE) 
+                  + nodematch("age",  diff=TRUE) 
+                  + nodematch("educ", diff=TRUE),
+                 
+                  control=control.ergm.ego(ppopsize="samp",
+                                           ppop.wt="sample",
+                                           stats.wt="data",
+                                           stats.est="survey"),
+                  ignore.max.alters=FALSE,
+                  boot.R = 1000,
+                  ergm = control.ergm(init.method = "MPLE",
+                  init.MPLE.samplesize = 5e8,
+                  MPLE.constraints.ignore = TRUE,
+                  MCMLE.effectiveSize = NULL,
+                  MCMC.burnin = 5e4,
+                  MCMC.interval = 5e4,
+                  MCMC.samplesize = 8000,
+                  parallel = 16,
+                  SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_jjvv_2016)
+```
+
+## Religion
+```{r}
+egor_relig[["ego"]]  <-egor_relig[["ego"]]%>%drop_na(educ)
+egor_relig[["alter"]]<-egor_relig[["alter"]]%>%drop_na(educ)
+egor_relig[["ego"]]  <-egor_relig[["ego"]]%>%drop_na(age)
+egor_relig[["alter"]]<-egor_relig[["alter"]]%>%drop_na(age)
+
+modelo_relig_2016<-ergm.ego(egor_relig~
+                  + nodefactor("gender")
+                  + nodefactor("age", levels = -LARGEST)
+                  #+ nodefactor("educ")
+                  + nodematch("gender",  diff=TRUE) 
+                  + nodematch("age",  diff=TRUE) 
+                  + nodematch("educ", diff=TRUE),
+                 
+                  control=control.ergm.ego(ppopsize="samp",
+                                           ppop.wt="sample",
+                                           stats.wt="data",
+                                           stats.est="survey"),
+                  ignore.max.alters=FALSE,
+                  boot.R = 1000,
+                  ergm = control.ergm(init.method = "MPLE",
+                  init.MPLE.samplesize = 5e8,
+                  MPLE.constraints.ignore = TRUE,
+                  MCMLE.effectiveSize = NULL,
+                  MCMC.burnin = 5e4,
+                  MCMC.interval = 5e4,
+                  MCMC.samplesize = 8000,
+                  parallel = 16,
+                  SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_relig_2016)
+```
+
+## EEAA
+```{r}
+egor_eeaa[["ego"]]  <-egor_eeaa[["ego"]]%>%drop_na(educ)
+egor_eeaa[["alter"]]<-egor_eeaa[["alter"]]%>%drop_na(educ)
+egor_eeaa[["ego"]]  <-egor_eeaa[["ego"]]%>%drop_na(age)
+egor_eeaa[["alter"]]<-egor_eeaa[["alter"]]%>%drop_na(age)
+
+modelo_eeaa_2016<-ergm.ego(egor_eeaa~
+                    nodefactor("gender")
+                  + nodefactor("age", levels = -LARGEST)
+                  + nodematch("gender",  diff=TRUE) 
+                  + nodematch("age",  diff=TRUE) 
+                  + nodematch("educ", diff=TRUE),
+                 
+                  control=control.ergm.ego(ppopsize="samp",
+                                           ppop.wt="sample",
+                                           stats.wt="data",
+                                           stats.est="survey"),
+                  ignore.max.alters=FALSE,
+                  boot.R = 1000,
+                  ergm = control.ergm(init.method = "MPLE",
+                  init.MPLE.samplesize = 5e7,
+                  MPLE.constraints.ignore = TRUE,
+                  MCMLE.effectiveSize = NULL,
+                  MCMC.burnin = 5e4,
+                  MCMC.interval = 5e4,
+                  MCMC.samplesize = 7500,
+                  parallel = 16,
+                  SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_eeaa_2016)
+```
+
+## Sport
+```{r}
+egor_sport[["ego"]]  <-egor_sport[["ego"]]%>%drop_na(educ)
+egor_sport[["alter"]]<-egor_sport[["alter"]]%>%drop_na(educ)
+egor_sport[["ego"]]  <-egor_sport[["ego"]]%>%drop_na(age)
+egor_sport[["alter"]]<-egor_sport[["alter"]]%>%drop_na(age)
+
+
+modelo_sport_2016<-ergm.ego(egor_sport~
+                    nodefactor("gender")
+                  + nodefactor("age", levels = -LARGEST)
+                  + nodematch("gender",  diff=TRUE) 
+                  + nodematch("age",  diff=TRUE) 
+                  + nodematch("educ", diff=TRUE),
+                 
+                  control=control.ergm.ego(ppopsize="samp",
+                                           ppop.wt="sample",
+                                           stats.wt="data",
+                                           stats.est="survey"),
+                  ignore.max.alters=FALSE,
+                  boot.R = 1000,
+                  ergm = control.ergm(init.method = "MPLE",
+                  init.MPLE.samplesize = 5e7,
+                  MPLE.constraints.ignore = TRUE,
+                  MCMLE.effectiveSize = NULL,
+                  MCMC.burnin = 5e4,
+                  MCMC.interval = 5e4,
+                  MCMC.samplesize = 7500,
+                  parallel = 16,
+                  SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_sport_2016)
+```
+
+## Political party
+```{r}
+
+egor_polparty[["ego"]]  <-egor_polparty[["ego"]]%>%drop_na(educ)
+egor_polparty[["alter"]]<-egor_polparty[["alter"]]%>%drop_na(educ)
+egor_polparty[["ego"]]  <-egor_polparty[["ego"]]%>%drop_na(age)
+egor_polparty[["alter"]]<-egor_polparty[["alter"]]%>%drop_na(age)
+
+modelo_polparty<-ergm.ego(egor_polparty~
+                    nodefactor("gender")
+                  + nodefactor("age", levels = -LARGEST)
+                  + nodematch("gender", diff=TRUE) 
+                  + nodematch("age",  diff=TRUE) 
+                  + nodematch("educ", diff=TRUE),
+                 
+                  control=control.ergm.ego(ppopsize="samp",
+                                           ppop.wt="sample",
+                                           stats.wt="data",
+                                           stats.est="survey"),
+                  ignore.max.alters=FALSE,
+                  boot.R = 1000,
+                  ergm = control.ergm(init.method = "MPLE",
+                  init.MPLE.samplesize = 5e7,
+                  MPLE.constraints.ignore = TRUE,
+                  MCMLE.effectiveSize = NULL,
+                  MCMC.burnin = 5e4,
+                  MCMC.interval = 5e4,
+                  MCMC.samplesize = 7500,
+                  parallel = 16,
+                  SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_polparty)
+```
+
+
+## Professional
+```{r}
+
+egor_prof[["ego"]]  <-egor_prof[["ego"]]%>%drop_na(educ)
+egor_prof[["alter"]]<-egor_prof[["alter"]]%>%drop_na(educ)
+egor_prof[["ego"]]  <-egor_prof[["ego"]]%>%drop_na(age)
+egor_prof[["alter"]]<-egor_prof[["alter"]]%>%drop_na(age)
+
+modelo_prof_2016<-ergm.ego(egor_prof~
+                             nodefactor("gender")
+                           + nodefactor("age", levels = -LARGEST)
+                           + nodematch("gender",  diff=TRUE) 
+                           + nodematch("age", diff=TRUE) 
+                           + nodematch("educ", diff=TRUE),
+                           
+                           control=control.ergm.ego(ppopsize="samp",
+                                                    ppop.wt="sample",
+                                                    stats.wt="data",
+                                                    stats.est="survey"),
+                           ignore.max.alters=FALSE,
+                           boot.R = 1000,
+                           ergm = control.ergm(init.method = "MPLE",
+                           init.MPLE.samplesize = 5e7,
+                           MPLE.constraints.ignore = TRUE,
+                           MCMLE.effectiveSize = NULL,
+                           MCMC.burnin = 5e4,
+                           MCMC.interval = 5e4,
+                           MCMC.samplesize = 7500,
+                           parallel = 16,
+                           SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_prof_2016)
+```
+
+## Labor Union
+```{r}
+egor_labu[["ego"]]  <-egor_labu[["ego"]]%>%drop_na(educ)
+egor_labu[["alter"]]<-egor_labu[["alter"]]%>%drop_na(educ)
+egor_labu[["ego"]]  <-egor_labu[["ego"]]%>%drop_na(age)
+egor_labu[["alter"]]<-egor_labu[["alter"]]%>%drop_na(age)
+
+modelo_labu_2016<-ergm.ego(egor_labu~
+                             nodefactor("gender")
+                           + nodefactor("age", levels = -LARGEST)
+                           + nodematch("gender",  diff=TRUE) 
+                           + nodematch("age",  diff=TRUE) 
+                           + nodematch("educ", diff=TRUE),
+                          
+                           control=control.ergm.ego(ppopsize="samp",
+                                                    ppop.wt="sample",
+                                                    stats.wt="data",
+                                                    stats.est="survey"),
+                           ignore.max.alters=FALSE,
+                           boot.R = 1000,
+                           ergm = control.ergm(init.method = "MPLE",
+                           init.MPLE.samplesize = 5e7,
+                           MPLE.constraints.ignore = TRUE,
+                           MCMLE.effectiveSize = NULL,
+                           MCMC.burnin = 5e4,
+                           MCMC.interval = 5e4,
+                           MCMC.samplesize = 7500,
+                           parallel = 16,
+                           SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_labu_2016)
+```
+
+## Charity
+```{r}
+egor_chari[["ego"]]  <-egor_chari[["ego"]]%>%drop_na(educ)
+egor_chari[["alter"]]<-egor_chari[["alter"]]%>%drop_na(educ)
+egor_chari[["ego"]]  <-egor_chari[["ego"]]%>%drop_na(age)
+egor_chari[["alter"]]<-egor_chari[["alter"]]%>%drop_na(age)
+
+modelo_chari_2016<-ergm.ego(egor_chari~
+                              nodefactor("gender")
+                            + nodefactor("age", levels = -LARGEST)
+                            + nodematch("gender",  diff=TRUE) 
+                            + nodematch("age",  diff=TRUE) 
+                            + nodematch("educ", diff=TRUE),
+                           
+                            control=control.ergm.ego(ppopsize="samp",
+                                                     ppop.wt="sample",
+                                                     stats.wt="data",
+                                                     stats.est="survey"),
+                            ignore.max.alters=FALSE,
+                            boot.R = 1000,
+                            ergm = control.ergm(init.method = "MPLE",
+                            init.MPLE.samplesize = 5e7,
+                            MPLE.constraints.ignore = TRUE,
+                            MCMLE.effectiveSize = NULL,
+                            MCMC.burnin = 5e4,
+                            MCMC.interval = 5e4,
+                            MCMC.samplesize = 7500,
+                            parallel = 16,
+                            SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_chari_2016)
+```
+
+## Other
+```{r}
+egor_other[["ego"]]  <-egor_other[["ego"]]%>%drop_na(educ)
+egor_other[["alter"]]<-egor_other[["alter"]]%>%drop_na(educ)
+egor_other[["ego"]]  <-egor_other[["ego"]]%>%drop_na(age)
+egor_other[["alter"]]<-egor_other[["alter"]]%>%drop_na(age)
+
+modelo_other_2016<-ergm.ego(egor_other~
+                              nodefactor("gender")
+                            + nodefactor("age", levels = -LARGEST)
+                            + nodematch("gender",  diff=TRUE) 
+                            + nodematch("age",  diff=TRUE) 
+                            + nodematch("educ", diff=TRUE),
+                           
+                            control=control.ergm.ego(ppopsize="samp",
+                                                     ppop.wt="sample",
+                                                     stats.wt="data",
+                                                     stats.est="survey"),
+                            ignore.max.alters=FALSE,
+                            boot.R = 1000,
+                            ergm = control.ergm(init.method = "MPLE",
+                            init.MPLE.samplesize = 5e7,
+                            MPLE.constraints.ignore = TRUE,
+                            MCMLE.effectiveSize = NULL,
+                            MCMC.burnin = 5e4,
+                            MCMC.interval = 5e4,
+                            MCMC.samplesize = 7500,
+                            parallel = 16,
+                            SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_other_2016)
+```
+
+
+
+# 2018
+
+```{r}
+set.seed(5)
+options(scipen = 999) #disable scientific notation
+library(ggplot2)
+library(GGally)
+library(cowplot)
+library(reshape2)
+library(rms)
+library(igraph)
+
+
+## edgelist desde backbone (podría ser con una matriz de solo 0)
+edge <- melt(fdsm2) 
+
+colnames(edge) <- c("i", "j", "collab")
+edge$collab[which(edge$i==edge$j)] <- NA  #Make diagonal missing
+head(edge)
+```
+
+
+
+```{r}
+## Agregar atributos de nodos
+atributos1 <- data.frame(i=atributos_2018$idencuesta, gender.i=atributos_2018$women,
+                      age.i=atributos_2018$age, educ.i = atributos_2018$educ,
+                      jjvv.i=atributos_2018$JJVV, relig.i=atributos_2018$Religious,
+                      eeaa.i=atributos_2018$AAEE, sport.i=atributos_2018$Sporty,
+                      polparty.i=atributos_2018$Polit.party, prof.i=atributos_2018$Professional,
+                      labu.i=atributos_2018$Labor.union, chari.i=atributos_2018$Charity,
+                      other.i=atributos_2018$Other)
+edge <- merge(edge, atributos1, by="i")
+
+atributos2 <- data.frame(j=atributos_2018$idencuesta, gender.j=atributos_2018$women,
+                      age.j=atributos_2018$age, educ.j = atributos_2018$educ,
+                       jjvv.j=atributos_2018$JJVV, relig.j=atributos_2018$Religious,
+                      eeaa.j=atributos_2018$AAEE, sport.j=atributos_2018$Sporty,
+                      polparty.j=atributos_2018$Polit.party, prof.j=atributos_2018$Professional,
+                      labu.j=atributos_2018$Labor.union, chari.j=atributos_2018$Charity,
+                      other.j=atributos_2018$Other)
+edge <- merge(edge, atributos2, by="j")
+
+egos<-atributos1%>%
+  dplyr::select(i,gender=gender.i, age=age.i, educ=educ.i)
+
+```
+
+
+```{r}
+# eliminar NA en y
+edge<-edge %>% tidyr::drop_na(collab)
+```
+
+## Construir match-variables
+```{r}
+## género
+edge$bothmen <- 0
+edge$bothmen[which(edge$gender.i=="men" & edge$gender.j=="men")] <- 1
+
+edge$bothwomen <- 0
+edge$bothwomen[which(edge$gender.i=="women" & edge$gender.j=="women")] <- 1
+
+## edad
+edge$both.old.adult <- 0
+edge$both.old.adult[which(edge$age.i=="older adult" & edge$age.j=="older adult")] <- 1
+
+edge$bothadult <- 0
+edge$bothadult[which(edge$age.i=="adult" & edge$age.j=="adult")] <- 1
+
+edge$bothyoung <- 0
+edge$bothyoung[which(edge$party.i=="young" & edge$party.j=="young")] <- 1
+
+## educa
+edge$bothuniv <- 0
+edge$bothuniv[which(edge$educ.i=="university" & edge$educ.j=="university")] <- 1
+
+edge$both.non.univ <- 0
+edge$both.non.univ[which(edge$educ.i=="non-university" & edge$educ.j=="non-university")] <- 1
+
+## degree
+edge$mindegree <- edge$degree.i
+edge$mindegree[which(edge$degree.j < edge$degree.i)] <- edge$degree.j[which(edge$degree.j < edge$degree.i)]
+
+## JJVV
+edge$bothjjvv<-0
+edge$bothjjvv[which(edge$jjvv.i==1 & edge$jjvv.j==1)] <- 1
+
+## Relig
+edge$bothrelig<-0
+edge$bothrelig[which(edge$relig.i==1 & edge$relig.j==1)] <- 1
+
+## EEAA
+edge$botheeaa<-0
+edge$botheeaa[which(edge$eeaa.i==1 & edge$eeaa.j==1)] <- 1
+
+## Sport
+edge$bothsport<-0
+edge$bothsport[which(edge$sport.i==1 & edge$sport.j==1)]<-1
+                      
+## pol. party
+edge$bothpolparty<-0
+edge$bothpolparty[which(edge$polparty.i==1 & edge$polparty.j==1)] <- 1
+
+## professional
+edge$bothprof<-0
+edge$bothprof[which(edge$prof.i==1 & edge$prof.j==1)] <- 1
+
+## labor union
+edge$bothlabu<-0
+edge$bothlabu[which(edge$labu.i==1 & edge$labu.j==1)] <- 1 
+
+## charity
+edge$bothchari<-0
+edge$bothchari[which(edge$chari.i==1 & edge$chari.j==1)] <- 1
+
+## other
+edge$bothother<-0
+edge$bothother[which(edge$other.i==1 & edge$other.j==1)] <- 1
+                      
+```
+
+
+## transform to egor
+```{r}
+edge_jjvv<-edge%>%
+  dplyr::filter(edge$bothjjvv==1)%>% #filtrar por diadas observadas
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothjjvv)
+
+edge_relig<-edge%>%
+  dplyr::filter(edge$bothrelig==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothrelig)
+
+edge_eeaa<-edge%>%
+  dplyr::filter(edge$botheeaa==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, botheeaa)
+
+edge_sport<-edge%>%
+  dplyr::filter(edge$bothsport==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothsport)
+
+edge_polparty<-edge%>%
+  dplyr::filter(edge$bothpolparty==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothpolparty)
+
+edge_prof<-edge%>%
+  dplyr::filter(edge$bothprof==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothprof)
+
+edge_labu<-edge%>%
+  dplyr::filter(edge$bothlabu==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothlabu)
+
+edge_chari<-edge%>%
+  dplyr::filter(edge$bothchari==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothchari)
+
+edge_other<-edge%>%
+  dplyr::filter(edge$bothother==1)%>%
+  dplyr::select(i,j,gender=gender.j,age=age.j,educ=educ.j, bothother)
+
+```
+
+
+```{r}
+library(egor)
+#rm(model, fdsm1, fdsm2,fdsm_bb_2016,fdsm_bb_2018, fdsm_2016, fdsm_2018)
+
+
+egor_jjvv <- egor(alters = edge_jjvv, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_relig <- egor(alters = edge_relig, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_eeaa <- egor(alters = edge_eeaa, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_sport <- egor(alters = edge_sport, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_polparty <- egor(alters = edge_polparty, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_prof <- egor(alters = edge_prof, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_labu <- egor(alters = edge_labu, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_chari <- egor(alters = edge_chari, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+egor_other <- egor(alters = edge_other, 
+                  egos = egos,
+                  ID.vars = list(
+                    ego = "i",
+                    alter = "j"))
+
+```
+
+
+# modelos `ergm.ego` 2018
+## JJVV
+```{r}
+library(ergm.ego)
+library(egor)
+install.packages("ergm")
+library(ergm)
+library(tidyverse)
+
+egor_jjvv[["ego"]]  <-egor_jjvv[["ego"]]%>%drop_na(educ)
+egor_jjvv[["alter"]]<-egor_jjvv[["alter"]]%>%drop_na(educ)
+egor_jjvv[["ego"]]  <-egor_jjvv[["ego"]]%>%drop_na(age)
+egor_jjvv[["alter"]]<-egor_jjvv[["alter"]]%>%drop_na(age)
+
+modelo_jjvv_2018<-ergm.ego(egor_jjvv~
+                    nodefactor("gender")
+                  + nodefactor("age", levels = -LARGEST)
+                  + nodematch("gender",  diff=TRUE) 
+                  + nodematch("age",  diff=TRUE) 
+                  + nodematch("educ", diff=TRUE),
+                 
+                  control=control.ergm.ego(ppopsize="samp",
+                                           ppop.wt="sample",
+                                           stats.wt="data",
+                                           stats.est="survey"),
+                  ignore.max.alters=FALSE,
+                  boot.R = 1000,
+                  ergm = control.ergm(init.method = "MPLE",
+                  init.MPLE.samplesize = 5e8,
+                  MPLE.constraints.ignore = TRUE,
+                  MCMLE.effectiveSize = NULL,
+                  MCMC.burnin = 5e4,
+                  MCMC.interval = 5e4,
+                  MCMC.samplesize = 8000,
+                  parallel = 16,
+                  SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_jjvv_2018)
+```
+
+## Religion
+```{r}
+egor_relig[["ego"]]  <-egor_relig[["ego"]]%>%drop_na(educ)
+egor_relig[["alter"]]<-egor_relig[["alter"]]%>%drop_na(educ)
+egor_relig[["ego"]]  <-egor_relig[["ego"]]%>%drop_na(age)
+egor_relig[["alter"]]<-egor_relig[["alter"]]%>%drop_na(age)
+
+modelo_relig_2018<-ergm.ego(egor_relig~
+                              nodefactor("gender")
+                            + nodefactor("age", levels = -LARGEST)
+                            + nodematch("gender",  diff=TRUE) 
+                            + nodematch("age",  diff=TRUE) 
+                            + nodematch("educ", diff=TRUE),
+                           
+                            control=control.ergm.ego(ppopsize="samp",
+                                                     ppop.wt="sample",
+                                                     stats.wt="data",
+                                                     stats.est="survey"),
+                            ignore.max.alters=FALSE,
+                            boot.R = 1000,
+                            ergm = control.ergm(init.method = "MPLE",
+                            init.MPLE.samplesize = 5e8,
+                            MPLE.constraints.ignore = TRUE,
+                            MCMLE.effectiveSize = NULL,
+                            MCMC.burnin = 5e4,
+                            MCMC.interval = 5e4,
+                            MCMC.samplesize = 8000,
+                            parallel = 16,
+                            SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_relig_2018)
+```
+
+## EEAA
+```{r}
+egor_eeaa[["ego"]]  <-egor_eeaa[["ego"]]%>%drop_na(educ)
+egor_eeaa[["alter"]]<-egor_eeaa[["alter"]]%>%drop_na(educ)
+egor_eeaa[["ego"]]  <-egor_eeaa[["ego"]]%>%drop_na(age)
+egor_eeaa[["alter"]]<-egor_eeaa[["alter"]]%>%drop_na(age)
+
+modelo_eeaa_2018<-ergm.ego(egor_eeaa~
+                             nodefactor("gender")
+                           + nodefactor("age", levels = -LARGEST)
+                           + nodematch("gender",  diff=TRUE) 
+                           + nodematch("age",  diff=TRUE) 
+                           + nodematch("educ", diff=TRUE),
+                 
+                           control=control.ergm.ego(ppopsize="samp",
+                                                    ppop.wt="sample",
+                                                    stats.wt="data",
+                                                    stats.est="survey"),
+                           ignore.max.alters=FALSE,
+                           boot.R = 1000,
+                           ergm = control.ergm(init.method = "MPLE",
+                           init.MPLE.samplesize = 5e7,
+                           MPLE.constraints.ignore = TRUE,
+                           MCMLE.effectiveSize = NULL,
+                           MCMC.burnin = 5e4,
+                           MCMC.interval = 5e4,
+                           MCMC.samplesize = 7500,
+                           parallel = 16,
+                           SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_eeaa_2018)
+```
+
+## Sport
+```{r}
+egor_sport[["ego"]]  <-egor_sport[["ego"]]%>%drop_na(educ)
+egor_sport[["alter"]]<-egor_sport[["alter"]]%>%drop_na(educ)
+egor_sport[["ego"]]  <-egor_sport[["ego"]]%>%drop_na(age)
+egor_sport[["alter"]]<-egor_sport[["alter"]]%>%drop_na(age)
+
+modelo_sport_2018<-ergm.ego(egor_sport~
+                              nodefactor("gender")
+                            + nodefactor("age", levels = -LARGEST)
+                            + nodematch("gender",  diff=TRUE) 
+                            + nodematch("age",  diff=TRUE) 
+                            + nodematch("educ", diff=TRUE),
+                           
+                            control=control.ergm.ego(ppopsize="samp",
+                                                     ppop.wt="sample",
+                                                     stats.wt="data",
+                                                     stats.est="survey"),
+                            ignore.max.alters=FALSE,
+                            boot.R = 1000,
+                            ergm = control.ergm(init.method = "MPLE",
+                            init.MPLE.samplesize = 5e7,
+                            MPLE.constraints.ignore = TRUE,
+                            MCMLE.effectiveSize = NULL,
+                            MCMC.burnin = 5e4,
+                            MCMC.interval = 5e4,
+                            MCMC.samplesize = 7500,
+                            parallel = 16,
+                            SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_sport_2018)
+```
+
+## Political party
+```{r}
+egor_polparty[["ego"]]  <-egor_polparty[["ego"]]%>%drop_na(educ)
+egor_polparty[["alter"]]<-egor_polparty[["alter"]]%>%drop_na(educ)
+egor_polparty[["ego"]]  <-egor_polparty[["ego"]]%>%drop_na(age)
+egor_polparty[["alter"]]<-egor_polparty[["alter"]]%>%drop_na(age)
+
+modelo_polparty_2018<-ergm.ego(egor_polparty~
+                                 nodefactor("gender")
+                               + nodefactor("age", levels = -LARGEST)
+                               + nodematch("gender",  diff=TRUE) 
+                               + nodematch("age",  diff=TRUE) 
+                               + nodematch("educ", diff=TRUE),
+                              
+                               control=control.ergm.ego(ppopsize="samp",
+                                                        ppop.wt="sample",
+                                                        stats.wt="data",
+                                                        stats.est="survey"),
+                               ignore.max.alters=FALSE,
+                               boot.R = 1000,
+                               ergm = control.ergm(init.method = "MPLE",
+                               init.MPLE.samplesize = 5e7,
+                               MPLE.constraints.ignore = TRUE,
+                               MCMLE.effectiveSize = NULL,
+                               MCMC.burnin = 5e4,
+                               MCMC.interval = 5e4,
+                               MCMC.samplesize = 7500,
+                               parallel = 16,
+                               SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_polparty_2018)
+```
+
+
+## Professional
+```{r}
+egor_prof[["ego"]]  <-egor_prof[["ego"]]%>%drop_na(educ)
+egor_prof[["alter"]]<-egor_prof[["alter"]]%>%drop_na(educ)
+egor_prof[["ego"]]  <-egor_prof[["ego"]]%>%drop_na(age)
+egor_prof[["alter"]]<-egor_prof[["alter"]]%>%drop_na(age)
+
+
+modelo_prof_2018<-ergm.ego(egor_prof~
+                             nodefactor("gender")
+                           + nodefactor("age", levels = -LARGEST)
+                           + nodematch("gender",  diff=TRUE) 
+                           + nodematch("age",  diff=TRUE) 
+                           + nodematch("educ", diff=TRUE),
+                 
+                           control=control.ergm.ego(ppopsize="samp",
+                                                    ppop.wt="sample",
+                                                    stats.wt="data",
+                                                    stats.est="survey"),
+                           ignore.max.alters=FALSE,
+                           boot.R = 1000,
+                           ergm = control.ergm(init.method = "MPLE",
+                           init.MPLE.samplesize = 5e7,
+                           MPLE.constraints.ignore = TRUE,
+                           MCMLE.effectiveSize = NULL,
+                           MCMC.burnin = 5e4,
+                           MCMC.interval = 5e4,
+                           MCMC.samplesize = 7500,
+                           parallel = 16,
+                           SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_prof_2018)
+```
+
+## Labor Union
+```{r}
+egor_labu[["ego"]]  <-egor_labu[["ego"]]%>%drop_na(educ)
+egor_labu[["alter"]]<-egor_labu[["alter"]]%>%drop_na(educ)
+egor_labu[["ego"]]  <-egor_labu[["ego"]]%>%drop_na(age)
+egor_labu[["alter"]]<-egor_labu[["alter"]]%>%drop_na(age)
+
+modelo_labu_2018<-ergm.ego(egor_labu~
+                             nodefactor("gender")
+                           + nodefactor("age", levels = -LARGEST)
+                           + nodematch("gender",  diff=TRUE) 
+                           + nodematch("age",  diff=TRUE) 
+                           + nodematch("educ", diff=TRUE),
+                          
+                           control=control.ergm.ego(ppopsize="samp",
+                                                    ppop.wt="sample",
+                                                    stats.wt="data",
+                                                    stats.est="survey"),
+                           ignore.max.alters=FALSE,
+                           boot.R = 1000,
+                           ergm = control.ergm(init.method = "MPLE",
+                           init.MPLE.samplesize = 5e7,
+                           MPLE.constraints.ignore = TRUE,
+                           MCMLE.effectiveSize = NULL,
+                           MCMC.burnin = 5e4,
+                           MCMC.interval = 5e4,
+                           MCMC.samplesize = 7500,
+                           parallel = 16,
+                           SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_labu_2018)
+```
+
+## Charity
+```{r}
+egor_chari[["ego"]]  <-egor_chari[["ego"]]%>%drop_na(educ)
+egor_chari[["alter"]]<-egor_chari[["alter"]]%>%drop_na(educ)
+egor_chari[["ego"]]  <-egor_chari[["ego"]]%>%drop_na(age)
+egor_chari[["alter"]]<-egor_chari[["alter"]]%>%drop_na(age)
+
+modelo_chari_2018<-ergm.ego(egor_chari~
+                              nodefactor("gender")
+                            + nodefactor("age", levels = -LARGEST)
+                            + nodematch("gender",  diff=TRUE) 
+                            + nodematch("age",  diff=TRUE) 
+                            + nodematch("educ", diff=TRUE),
+                 
+                            control=control.ergm.ego(ppopsize="samp",
+                                                     ppop.wt="sample",
+                                                     stats.wt="data",
+                                                     stats.est="survey"),
+                            ignore.max.alters=FALSE,
+                            boot.R = 1000,
+                            ergm = control.ergm(init.method = "MPLE",
+                            init.MPLE.samplesize = 5e7,
+                            MPLE.constraints.ignore = TRUE,
+                            MCMLE.effectiveSize = NULL,
+                            MCMC.burnin = 5e4,
+                            MCMC.interval = 5e4,
+                            MCMC.samplesize = 7500,
+                            parallel = 16,
+                            SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_chari_2018)
+```
+
+## Other
+```{r}
+egor_other[["ego"]]  <-egor_other[["ego"]]%>%drop_na(educ)
+egor_other[["alter"]]<-egor_other[["alter"]]%>%drop_na(educ)
+egor_other[["ego"]]  <-egor_other[["ego"]]%>%drop_na(age)
+egor_other[["alter"]]<-egor_other[["alter"]]%>%drop_na(age)
+
+modelo_other_2018<-ergm.ego(egor_other~
+                         nodefactor("gender")
+                       + nodefactor("age", levels = -LARGEST)
+                       + nodematch("gender",  diff=TRUE) 
+                       + nodematch("age",  diff=TRUE) 
+                       + nodematch("educ", diff=TRUE),
+                      
+                       control=control.ergm.ego(ppopsize="samp",
+                                                ppop.wt="sample",
+                                                stats.wt="data",
+                                                stats.est="survey"),
+                       ignore.max.alters=FALSE,
+                       boot.R = 1000,
+                       ergm = control.ergm(init.method = "MPLE",
+                       init.MPLE.samplesize = 5e7,
+                       MPLE.constraints.ignore = TRUE,
+                       MCMLE.effectiveSize = NULL,
+                       MCMC.burnin = 5e4,
+                       MCMC.interval = 5e4,
+                       MCMC.samplesize = 7500,
+                       parallel = 16,
+                       SAN.nsteps = 5e7))
+
+
+#?control.ergm.ego
+summary(modelo_other_2018)
+```
+
+
+

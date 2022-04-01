@@ -1,0 +1,649 @@
+---
+title: "Modelos Regresion Multinomial"
+author: "Guillermo Beck"
+date: "12-10-2021"
+output:
+  html_document:
+    theme: paper
+    highlight: kate
+    number_sections: true
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    fig_width: 10 
+    fig_height: 8 
+    code_folding: "hide"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(ggplot2)
+library(ggthemes)
+# library(tydyverse)
+library(sjlabelled)
+library(sjPlot)
+library(car)
+library(vcd)
+library(texreg)
+library(ordinal)
+library(nnet)
+library(MASS)
+library(mlogit)
+library(haven)
+library(sjmisc)
+library(expss)
+library(stringr)
+library(ergm.ego)
+library(tibble)
+library(ggpubr)
+library(car)
+library(dplyr)
+library(ggeffects)
+library(kableExtra)
+# library(frequency)
+library(knitr)
+library(sjmisc)
+
+library(foreign)
+library(psych)
+library(psy)
+library(nFactors)
+library(GPArotation)
+library(mvnormtest)
+library(mvShapiroTest)
+library(poLCA)
+```
+
+
+# Cargar Bases de regresion
+
+```{r}
+load("C:/Users/gmobe/Dropbox/Redes Sociales/Paper_Redes_Long/02. Data/Base_reg_L.Rda")
+load("C:/Users/gmobe/Dropbox/Redes Sociales/Paper_Redes_Long/02. Data/Base_reg_W.Rda")
+
+# load("C:/Users/guillermo.beck/Dropbox/Redes Sociales/Paper_Redes_Long/02. Data/Base_reg_L.Rda")
+# load("C:/Users/guillermo.beck/Dropbox/Redes Sociales/Paper_Redes_Long/02. Data/Base_reg_W.Rda")
+
+table(Base_Reg_W$Clase)
+table(Base_Reg_W$predclass,Base_Reg_W$Clase)
+
+
+```
+
+# Transformacion variable ingreso y educacion generar variable circulo (clase)
+
+```{r}
+# Pasar a continua variable educacion
+Base_Reg_W$edcont<-as.numeric(Base_Reg_W$edcat)
+
+table(Base_Reg_W$edcat,Base_Reg_W$edcont)
+
+# Dividir ingreso para mostrar un aumento por cada 100.000
+Base_Reg_W$ingreso_100<-(Base_Reg_W$ingreso/100)
+
+# Generar variable circulo
+Base_Reg_W$Circulo[Base_Reg_W$Clase=="C1-Baja"] <- "C1-Minimo (37%)"
+Base_Reg_W$Circulo[Base_Reg_W$Clase=="C2-Media-Baja"] <- "C2-Aislado (24%)"
+Base_Reg_W$Circulo[Base_Reg_W$Clase=="C3-Media-Alta"] <- "C3-Prestigioso (18%)"
+Base_Reg_W$Circulo[Base_Reg_W$Clase=="C4-Omnivora"] <- "C4-Omnivoro (21%)"
+
+table(Base_Reg_W$Circulo,Base_Reg_W$Clase)
+
+```
+
+
+# Multinomial
+
+## Instrumentales - Expresivas
+```{r, results = 'asis', echo = T}
+M1 = multinom(Circulo~ edcont+sexo+edad+ingreso_100+C08+voto_elec,                   
+              data=Base_Reg_W, trace=FALSE)
+
+M2 = multinom(Circulo~ edcont+sexo+edad+ingreso_100+C08+voto_elec+
+                       asociaciones1,
+              data=Base_Reg_W, trace=FALSE)
+
+M3 = multinom(Circulo~ edcont+sexo+edad+ingreso_100+C08+voto_elec+
+                       asociaciones2,
+              data=Base_Reg_W, trace=FALSE)
+
+M4 = multinom(Circulo~ edcont+sexo+edad+ingreso_100+C08+voto_elec+
+                       asociaciones1+
+                       asociaciones2,
+              data=Base_Reg_W, trace=FALSE)
+
+M5 = multinom(Circulo~ edcont+sexo+edad+ingreso_100+C08+voto_elec+
+                       asociaciones1*ingreso_100+ 
+                       asociaciones2*ingreso_100+
+              edcont+sexo+edad+ingreso_100+C08+voto_elec,                               
+              data=Base_Reg_W, trace=FALSE)
+
+M6 = multinom(Circulo~ edcont+sexo+edad+ingreso_100+C08+voto_elec+
+                       asociaciones1*edcont+ 
+                       asociaciones2*edcont,
+              data=Base_Reg_W, trace=FALSE)
+
+M7 = multinom(Circulo~ edcont+sexo+edad+ingreso_100+C08+voto_elec+
+                       asociaciones1*edcont+ 
+                       asociaciones2*edcont+ 
+                       C08*edcont,
+              data=Base_Reg_W, trace=FALSE)
+
+htmlreg(l=list(M1,M2,M3,M4,M5,M6,M7), stars=c(0.01,0.05,0.1), single.row = TRUE,
+caption = "Modelo Multinomial",
+custom.model.names =c("Covars","Expres","Instr","Expr/Instr","Asoc*Ing","Asoc*Ed","Asoc*Ed / Actv*Ed"),
+booktabs = TRUE, dcolumn = TRUE)
+
+```
+
+```{r}
+TablaM1<-as.data.frame(ctable <- coef(summary(M1)))
+TablaM1<-dplyr::select(TablaM1, starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM11<-as.data.frame(ctable <- exp(coef(summary(M1))))
+TablaM11<-dplyr::select(TablaM11, starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM1<-rbind(TablaM1,TablaM11)
+
+
+TablaM2<-as.data.frame(ctable <- coef(summary(M2)))
+TablaM2<-dplyr::select(TablaM2, starts_with("asociaciones"),starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM21<-as.data.frame(ctable <- exp(coef(summary(M2))))
+TablaM21<-dplyr::select(TablaM21, starts_with("asociaciones"),starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM2<-rbind(TablaM2,TablaM21)
+
+TablaM3<-as.data.frame(ctable <- coef(summary(M3)))
+TablaM3<-dplyr::select(TablaM3, starts_with("asociaciones"),starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM31<-as.data.frame(ctable <- exp(coef(summary(M3))))
+TablaM31<-dplyr::select(TablaM31, starts_with("asociaciones"),starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM3<-rbind(TablaM3,TablaM31)
+
+TablaM4<-as.data.frame(ctable <- coef(summary(M4)))
+TablaM4<-dplyr::select(TablaM4, starts_with("asociaciones"),starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM41<-as.data.frame(ctable <- exp(coef(summary(M4))))
+TablaM41<-dplyr::select(TablaM41, starts_with("asociaciones"),starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM4<-rbind(TablaM4,TablaM41)
+
+TablaM5<-as.data.frame(ctable <- coef(summary(M5)))
+TablaM5<-dplyr::select(TablaM5, starts_with("asociaciones"),starts_with("ingreso"))
+TablaM51<-as.data.frame(ctable <- exp(coef(summary(M5))))
+TablaM51<-dplyr::select(TablaM51, starts_with("asociaciones"), starts_with("ingreso"))
+TablaM5<-rbind(TablaM5,TablaM51)
+
+TablaM6<-as.data.frame(ctable <- coef(summary(M6)))
+TablaM6<-dplyr::select(TablaM6, starts_with("asociaciones"),starts_with("edcont"))
+TablaM61<-as.data.frame(ctable <- exp(coef(summary(M6))))
+TablaM61<-dplyr::select(TablaM61, starts_with("asociaciones"),starts_with("edcont"))
+TablaM6<-rbind(TablaM6,TablaM61)
+
+TablaM7<-as.data.frame(ctable <- coef(summary(M7)))
+TablaM7<-dplyr::select(TablaM7, starts_with("asociaciones"),starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM71<-as.data.frame(ctable <- exp(coef(summary(M7))))
+TablaM71<-dplyr::select(TablaM71, starts_with("asociaciones"),starts_with("edcont"),starts_with("ingreso"),starts_with("C08"))
+TablaM7<-rbind(TablaM7,TablaM71)
+
+```
+
+```{r}
+a1<-TablaM2[4,1]
+a2<-TablaM2[5,1]
+a3<-TablaM2[6,1]
+
+b1<-TablaM3[4,1]
+b2<-TablaM3[5,1]
+b3<-TablaM3[6,1]
+
+c1<-TablaM4[4,1]
+c2<-TablaM4[5,1]
+c3<-TablaM4[6,1]
+c4<-TablaM4[4,2]
+c5<-TablaM4[5,2]
+c6<-TablaM4[6,2]
+
+c7<-TablaM4[4,3]
+c8<-TablaM4[5,3]
+c9<-TablaM4[6,3]
+c10<-TablaM4[4,4]
+c11<-TablaM4[5,4]
+c12<-TablaM4[6,4]
+c13<-TablaM4[4,5]
+c14<-TablaM4[5,5]
+c15<-TablaM4[6,5]
+
+d1<-TablaM5[4,1]
+d2<-TablaM5[5,1]
+d3<-TablaM5[6,1]
+d4<-TablaM5[4,2]
+d5<-TablaM5[5,2]
+d6<-TablaM5[6,2]
+
+e1<-TablaM6[4,1]
+e2<-TablaM6[5,1]
+e3<-TablaM6[6,1]
+e4<-TablaM6[4,2]
+e5<-TablaM6[5,2]
+e6<-TablaM6[6,2]
+
+f1<-TablaM7[4,1]
+f2<-TablaM7[5,1]
+f3<-TablaM7[6,1]
+f4<-TablaM7[4,2]
+f5<-TablaM7[5,2]
+f6<-TablaM7[6,2]
+f7<-TablaM7[4,8]
+f8<-TablaM7[5,8]
+f9<-TablaM7[6,8]
+
+```
+
+
+## Betas de regresion y Valores predichos
+
+### Modelo 1 (Variables socioeconómicas y participacion civica)
+```{r}
+TablaM1 %>%
+  kbl() %>%
+  kable_styling()
+```
+
+### Modelo 2 (Asociaciones Expresivas)
+```{r, results = 'asis', echo = T}
+
+TablaM2 %>%
+  kbl() %>%
+  kable_styling()
+
+# MODELO2
+PV2<-as.data.frame(ggpredict(M2, "asociaciones1"))
+PV2$Circulo<-PV2$response.level
+
+ggplot(data=PV2, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.5)+
+  ylab("Valores predichos")+xlab("M2 Expresivas")
+```
+
+1) Para Expresivas:Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r a1`, lo cual significa que las chances de cambio son `r (round(100*(a1-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r a2`, lo cual significa que las chances de cambio son `r (round(100*(a2-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r a3`, lo cual significa que las chances de cambio son `r (round(100*(a3-1),2))`%
+
+
+### Modelo 3 (Asociaciones Intrumentales)
+```{r, results = 'asis', echo = T}
+
+TablaM3 %>%
+  kbl() %>%
+  kable_styling()
+
+# MODELO3
+PV3<-as.data.frame(ggpredict(M3, "asociaciones2"))
+PV3$Circulo<-PV3$response.level
+
+ggplot(data=PV3, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M3 Instrumentales")
+```
+
+2) Para Instrumentales: Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r b1`, lo cual significa que las chances de cambio son `r (round(100*(a1-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r b2`, lo cual significa que las chances de cambio son `r (round(100*(b2-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r b3`, lo cual significa que las chances de cambio son `r (round(100*(b3-1),2))`%
+
+### Modelo 4 (Modelo Completo)
+```{r, results = 'asis', echo = T}
+
+TablaM4 %>%
+  kbl() %>%
+  kable_styling()
+
+# MODELO4
+PV41<-as.data.frame(ggpredict(M4, "asociaciones1"))
+PV41$Circulo<-PV41$response.level
+
+ggplot(data=PV41, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M4 Expresivas")
+
+PV42<-as.data.frame(ggpredict(M4, "asociaciones2"))
+PV42$Circulo<-PV42$response.level
+
+ggplot(data=PV42, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M4 Instrumentales")
+
+#Edcuacion
+PV43<-as.data.frame(ggpredict(M4, "edcont"))
+PV43$Circulo<-PV43$response.level
+
+ggplot(data=PV43, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(1,4)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M4 Educacion")
+
+# Ingreso
+PV44<-as.data.frame(ggpredict(M4, "ingreso_100"))
+PV44$Circulo<-PV44$response.level
+
+ggplot(data=PV44, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  # xlim(0,1)+ylim(0,0.5)+
+  ylab("Valores predichos")+xlab("M4 Ingreso")
+
+# C08
+PV45<-as.data.frame(ggpredict(M4, "C08"))
+PV45$Circulo<-PV45$response.level
+
+ggplot(data=PV45, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(1,4)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M4 Activismo")
+
+
+```
+
+1) Para Expresivas:Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r c1`, lo cual significa que las chances de cambio son `r (round(100*(c1-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r c2`, lo cual significa que las chances de cambio son `r (round(100*(c2-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r c3`, lo cual significa que las chances de cambio son `r (round(100*(c3-1),2))`%
+
+2) Para Instrumentales: Los betas de regresión son positivos y estadíticamente significativos, excepto para Aislados.
+
+-  Las odds de ser Aislado respecto de Minimo son `r c4`, lo cual significa que las chances de cambio son `r (round(100*(c4-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r c5`, lo cual significa que las chances de cambio son `r (round(100*(c5-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r c6`, lo cual significa que las chances de cambio son `r (round(100*(c6-1),2))`%
+
+3) Para Educacion: Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r c7`, lo cual significa que las chances de cambio son `r (round(100*(c7-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r c8`, lo cual significa que las chances de cambio son `r (round(100*(c8-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r c9`, lo cual significa que las chances de cambio son `r (round(100*(c9-1),2))`%
+
+4) Para Ingreso: Los betas de regresión son curvilinea y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r c10`, lo cual significa que las chances de cambio son `r (round(100*(c10-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r c11`, lo cual significa que las chances de cambio son `r (round(100*(c11-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r c12`, lo cual significa que las chances de cambio son `r (round(100*(c12-1),2))`%
+
+5) Para activismo: Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r c13`, lo cual significa que las chances de cambio son `r (round(100*(c13-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r c14`, lo cual significa que las chances de cambio son `r (round(100*(c14-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r c15`, lo cual significa que las chances de cambio son `r (round(100*(c15-1),2))`%
+
+
+### Modelo 5 (Modelo Completo Interaccion c/Ingreso)
+```{r, results = 'asis', echo = T}
+
+# TablaM5 %>%
+#   kbl() %>%
+#   kable_styling()
+
+# MODELO5
+# PV51<-as.data.frame(ggpredict(M5, "asociaciones1"))
+# PV51$Circulo<-PV51$response.level
+# 
+# ggplot(data=PV51, aes(x=x, y=predicted, group=Circulo)) +
+#   geom_line(aes(color=Circulo))+
+#   labs(x = "Circulo")+
+#   theme(legend.position="bottom")+
+#   xlim(0,1)+ylim(0,0.7)+
+#   ylab("Valores predichos")+xlab("M4 Expresivas")
+# 
+# PV52<-as.data.frame(ggpredict(M5, "asociaciones2"))
+# PV52$Circulo<-PV52$response.level
+# 
+# ggplot(data=PV52, aes(x=x, y=predicted, group=Circulo)) +
+#   geom_line(aes(color=Circulo))+
+#   labs(x = "Circulo")+
+#   theme(legend.position="bottom")+
+#   xlim(0,1)+ylim(0,0.7)+
+#   ylab("Valores predichos")+xlab("M4 Instrumentales")
+
+```
+
+1) Para Expresivas:Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Minimo respecto de Minimo son `r d1`, lo cual significa que las chances de cambio son `r (round(100*(d1-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r d2`, lo cual significa que las chances de cambio son `r (round(100*(d2-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r d3`, lo cual significa que las chances de cambio son `r (round(100*(d3-1),2))`%
+
+2) Para Instrumentales: Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Minimo respecto de Minimo son `r d4`, lo cual significa que las chances de cambio son `r (round(100*(d4-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r d5`, lo cual significa que las chances de cambio son `r (round(100*(d5-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r d6`, lo cual significa que las chances de cambio son `r (round(100*(d6-1),2))`%
+
+### Modelo 6 (Modelo Completo Interaccion c/Educacion)
+```{r, results = 'asis', echo = T}
+
+TablaM6 %>%
+  kbl() %>%
+  kable_styling()
+
+# MODELO6
+PV61<-as.data.frame(ggpredict(M6, "asociaciones1"))
+PV61$Circulo<-PV61$response.level
+
+ggplot(data=PV61, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M6 Expresivas")
+
+PV62<-as.data.frame(ggpredict(M6, "asociaciones2"))
+PV62$Circulo<-PV62$response.level
+
+ggplot(data=PV62, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M6 Instrumentales")
+
+```
+
+1) Para Expresivas:Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r e1`, lo cual significa que las chances de cambio son `r (round(100*(e1-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r e2`, lo cual significa que las chances de cambio son `r (round(100*(e2-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r e3`, lo cual significa que las chances de cambio son `r (round(100*(e3-1),2))`%
+
+2) Para Instrumentales: Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r e4`, lo cual significa que las chances de cambio son `r (round(100*(e4-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r e5`, lo cual significa que las chances de cambio son `r (round(100*(e5-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r e6`, lo cual significa que las chances de cambio son `r (round(100*(e6-1),2))`%
+
+#### Interacciones Modelo 6 (asociaciones*educacion)
+
+```{r, results = 'asis', echo = T}
+# MODELO6 asociaciones1
+PV62<-as.data.frame(ggpredict(M6, c("asociaciones1","edcont")))
+PV62$Circulo<-PV62$response.level
+
+PV62$Educacion[PV62$group==1] <- "Primaria secundaria baja"
+PV62$Educacion[PV62$group==2] <- "Secundaria alta"
+PV62$Educacion[PV62$group==3] <- "Terciaria ciclo corto"
+PV62$Educacion[PV62$group==4] <- "Terciaria o mas"
+
+
+ggplot(data=PV62, aes(x=x, y=predicted, group=Educacion)) +
+  geom_line(aes(color=Educacion))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M6 Expresivas")
+
+
+# MODELO6 asociaciones2
+PV63<-as.data.frame(ggpredict(M6, c("asociaciones2","edcont")))
+PV63$Circulo<-PV63$response.level
+
+PV63$Educacion[PV63$group==1] <- "Primaria secundaria baja"
+PV63$Educacion[PV63$group==2] <- "Secundaria alta"
+PV63$Educacion[PV63$group==3] <- "Terciaria ciclo corto"
+PV63$Educacion[PV63$group==4] <- "Terciaria o mas"
+
+ggplot(data=PV63, aes(x=x, y=predicted, group=Educacion)) +
+  geom_line(aes(color=Educacion))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M6 Instrumentales")
+
+```
+
+### Modelo 7 (Modelo Completo asociaciones * educacion y c08 * educacion)
+
+```{r}
+TablaM7 %>%
+  kbl() %>%
+  kable_styling()
+
+# MODELO6
+PV71<-as.data.frame(ggpredict(M7, "asociaciones1"))
+PV71$Circulo<-PV71$response.level
+
+ggplot(data=PV71, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M7 Expresivas")
+
+PV72<-as.data.frame(ggpredict(M7, "asociaciones2"))
+PV72$Circulo<-PV72$response.level
+
+ggplot(data=PV72, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M7 Instrumentales")
+
+PV72<-as.data.frame(ggpredict(M7, "C08"))
+PV72$Circulo<-PV72$response.level
+
+ggplot(data=PV72, aes(x=x, y=predicted)) +
+  geom_line(aes(color=Circulo))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(1,4)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M7 Activismo")
+
+```
+
+
+1) Para Expresivas:Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r f1`, lo cual significa que las chances de cambio son `r (round(100*(f1-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r f2`, lo cual significa que las chances de cambio son `r (round(100*(f2-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r f3`, lo cual significa que las chances de cambio son `r (round(100*(f3-1),2))`%
+
+2) Para Instrumentales: Los betas de regresión son positivos y estadíticamente significativos, excepto para Aislado.
+
+-  Las odds de ser Aislado respecto de Minimo son `r f4`, lo cual significa que las chances de cambio son `r (round(100*(f4-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r f5`, lo cual significa que las chances de cambio son `r (round(100*(f5-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r f6`, lo cual significa que las chances de cambio son `r (round(100*(f6-1),2))`%
+
+3) Para activismo: Los betas de regresión son positivos y estadíticamente significativos.
+
+-  Las odds de ser Aislado respecto de Minimo son `r f7`, lo cual significa que las chances de cambio son `r (round(100*(f7-1),2))`%
+-  Las odds de ser Prestigioso respecto de Minimo son `r f8`, lo cual significa que las chances de cambio son `r (round(100*(f8-1),2))`%
+-  Las odds de ser Omnivoro respecto de Minimo son `r f9`, lo cual significa que las chances de cambio son `r (round(100*(f9-1),2))`%
+
+
+#### Interacciones Modelo 7 (asociaciones * educacion) (c08 * educacion) 
+```{r, results = 'asis', echo = T}
+# MODELO7 asociaciones1
+PV72<-as.data.frame(ggpredict(M7, c("asociaciones1","edcont")))
+PV72$Circulo<-PV72$response.level
+
+PV72$Educacion[PV72$group==1] <- "Primaria secundaria baja"
+PV72$Educacion[PV72$group==2] <- "Secundaria alta"
+PV72$Educacion[PV72$group==3] <- "Terciaria ciclo corto"
+PV72$Educacion[PV72$group==4] <- "Terciaria o mas"
+
+ggplot(data=PV72, aes(x=x, y=predicted, group=Educacion)) +
+  geom_line(aes(color=Educacion))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M7 Expresivas")
+
+
+# MODELO7 asociaciones2
+PV73<-as.data.frame(ggpredict(M7, c("asociaciones2","edcont")))
+PV73$Circulo<-PV73$response.level
+
+PV73$Educacion[PV73$group==1] <- "Primaria secundaria baja"
+PV73$Educacion[PV73$group==2] <- "Secundaria alta"
+PV73$Educacion[PV73$group==3] <- "Terciaria ciclo corto"
+PV73$Educacion[PV73$group==4] <- "Terciaria o mas"
+
+ggplot(data=PV73, aes(x=x, y=predicted, group=Educacion)) +
+  geom_line(aes(color=Educacion))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(0,1)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M7 Instrumentales")
+
+
+# MODELO7 Participacion
+PV74<-as.data.frame(ggpredict(M7, c("C08","edcont")))
+PV74$Circulo<-PV74$response.level
+
+PV74$Educacion[PV74$group==1] <- "Primaria secundaria baja"
+PV74$Educacion[PV74$group==2] <- "Secundaria alta"
+PV74$Educacion[PV74$group==3] <- "Terciaria ciclo corto"
+PV74$Educacion[PV74$group==4] <- "Terciaria o mas"
+
+ggplot(data=PV74, aes(x=x, y=predicted, group=Educacion)) +
+  geom_line(aes(color=Educacion))+
+  facet_wrap(~Circulo)+
+  labs(x = "Circulo")+
+  theme(legend.position="bottom")+
+  xlim(1,4)+ylim(0,0.7)+
+  ylab("Valores predichos")+xlab("M7 Activismo")
+
+```
